@@ -1,0 +1,6 @@
+.venv
+models
+tests
+.git
+__pycache__
+*.zip

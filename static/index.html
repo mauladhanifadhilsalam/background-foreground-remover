@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cutout Studio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>Cutout Studio</h1>
+    <p class="tagline">Remove backgrounds or objects. Fix the mask with a brush. Process many images at once.</p>
+  </header>
+
+  <main class="layout">
+    <!-- Options -->
+    <aside class="panel options" aria-label="Options">
+      <section>
+        <h2>Mode</h2>
+        <div class="segmented" role="radiogroup" id="mode">
+          <label><input type="radio" name="mode" value="remove_background" checked /><span>Remove background</span></label>
+          <label><input type="radio" name="mode" value="remove_foreground" /><span>Remove foreground</span></label>
+        </div>
+      </section>
+
+      <section id="fill-section" hidden>
+        <h2>Fill removed area</h2>
+        <div class="segmented" role="radiogroup">
+          <label><input type="radio" name="fill" value="inpaint" checked /><span>AI inpaint</span></label>
+          <label><input type="radio" name="fill" value="transparent" /><span>Transparent</span></label>
+        </div>
+      </section>
+
+      <section id="bg-section">
+        <h2>Background</h2>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="bg-solid" /> Solid colour</label>
+          <input type="color" id="bg-color" value="#ffffff" disabled aria-label="Background colour" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Edges</h2>
+        <label class="slider">
+          <span>Feather <output id="feather-out">0</output> px</span>
+          <input type="range" id="feather" min="0" max="20" step="0.5" value="0" />
+        </label>
+        <label class="slider">
+          <span>Grow / shrink <output id="shift-out">0</output> px</span>
+          <input type="range" id="shift" min="-20" max="20" step="1" value="0" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Detection model</h2>
+        <select id="model" aria-label="Detection model"></select>
+        <p class="hint">Slow models can take 30 s or more per image without a GPU.</p>
+      </section>
+    </aside>
+
+    <!-- Workspace -->
+    <section class="panel workspace" aria-label="Workspace">
+      <div id="dropzone" class="dropzone">
+        <input type="file" id="file-input" accept="image/*" multiple hidden />
+        <div class="dz-inner">
+          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true"><path fill="currentColor" d="M19 13v6H5v-6H3v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6h-2Zm-6 .17 2.59-2.58L17 12l-5 5-5-5 1.41-1.41L11 13.17V3h2v10.17Z" transform="rotate(180 12 12)"/></svg>
+          <p><strong>Drop images here</strong>, <button type="button" class="link" id="browse">browse</button>, or paste (Ctrl+V)</p>
+          <p class="hint">Drop several images to batch-process them. JPG, PNG and WebP up to 20 MB.</p>
+        </div>
+      </div>
+
+      <div id="editor" class="editor" hidden>
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tab-mask" aria-selected="true">Mask brush</button>
+          <button role="tab" id="tab-result" aria-selected="false">Result</button>
+          <span class="spacer"></span>
+          <span id="status" class="status" aria-live="polite"></span>
+        </div>
+
+        <div id="mask-view" class="view">
+          <div class="toolbar">
+            <div class="segmented small" role="radiogroup" aria-label="Brush">
+              <label title="Paint areas to keep (K)"><input type="radio" name="brush" value="keep" checked /><span>Keep</span></label>
+              <label title="Paint areas to remove (R)"><input type="radio" name="brush" value="remove" /><span>Remove</span></label>
+            </div>
+            <label class="slider inline" title="Brush size ([ and ])">
+              <span>Size</span>
+              <input type="range" id="brush-size" min="4" max="200" value="40" />
+            </label>
+            <button type="button" id="undo" title="Undo (Ctrl+Z)">Undo</button>
+            <button type="button" id="reset" title="Discard brush edits">Reset</button>
+            <button type="button" id="redetect" title="Run detection again with the selected model">Re-detect</button>
+            <label class="check" title="Show the area that will be removed"><input type="checkbox" id="show-overlay" checked /> Overlay</label>
+            <span class="spacer"></span>
+            <button type="button" id="apply" class="primary">Apply</button>
+          </div>
+          <div class="stage" id="stage">
+            <div class="canvas-wrap" id="canvas-wrap">
+              <canvas id="photo"></canvas>
+              <canvas id="overlay"></canvas>
+              <div id="cursor" class="brush-cursor" hidden></div>
+            </div>
+            <div id="busy" class="busy" hidden><div class="spinner"></div><span id="busy-text">Working…</span></div>
+          </div>
+          <p class="hint legend"><span class="swatch"></span><span>Tinted area will be removed. Paint with <b>Keep</b> or <b>Remove</b> to fix it, then press <b>Apply</b>.</span></p>
+        </div>
+
+        <div id="result-view" class="view" hidden>
+          <div class="toolbar">
+            <span class="hint">Drag the slider to compare before and after.</span>
+            <span class="spacer"></span>
+            <button type="button" id="download" class="primary">Download PNG</button>
+          </div>
+          <div class="stage">
+            <div class="compare" id="compare">
+              <img id="result-img" alt="Result" />
+              <div class="compare-before" id="compare-before"><img id="before-img" alt="Original" /></div>
+              <div class="compare-handle" id="compare-handle"></div>
+              <input type="range" id="compare-range" min="0" max="100" value="50" aria-label="Compare before and after" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Batch queue -->
+    <aside class="panel queue" aria-label="Images">
+      <div class="queue-head">
+        <h2>Images <span id="count" class="count">0</span></h2>
+        <button type="button" id="add-more" title="Add images">Add</button>
+      </div>
+      <div class="progress" id="progress" hidden><div id="progress-bar"></div></div>
+      <ul id="items" class="items"></ul>
+      <div class="queue-actions">
+        <button type="button" id="process-all" class="primary" disabled>Process all</button>
+        <button type="button" id="zip" disabled>Download ZIP</button>
+        <button type="button" id="clear" disabled>Clear</button>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="alert" hidden></div>
+
+  <script src="vendor/jszip.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
