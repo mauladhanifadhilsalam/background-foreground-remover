@@ -4,26 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app import config, inpainting, main, segmentation
+from app import config, main
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(fake_models):
     """App with the ML models replaced by cheap fakes (no downloads)."""
-
-    def fake_predict(img, model):
-        if model not in segmentation.MODELS:
-            raise segmentation.UnknownModelError(f"Unknown model '{model}'")
-        mask = Image.new("L", img.size, 0)
-        w, h = img.size
-        mask.paste(255, (w // 4, h // 4, 3 * w // 4, 3 * h // 4))
-        return mask
-
-    def fake_inpaint(img, mask):
-        return Image.new("RGB", img.size, (0, 255, 0))
-
-    monkeypatch.setattr(segmentation, "predict_mask", fake_predict)
-    monkeypatch.setattr(inpainting.inpainter, "inpaint", fake_inpaint)
     return TestClient(main.app)
 
 

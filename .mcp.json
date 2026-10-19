@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "cutout-studio": {
+      "command": ".venv/bin/cutout-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}

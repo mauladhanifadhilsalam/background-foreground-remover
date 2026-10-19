@@ -17,7 +17,7 @@ class LamaInpainter:
         self._session = None
         self._lock = threading.Lock()
 
-    def _get_session(self):
+    def load_session(self):
         with self._lock:
             if self._session is None:
                 import onnxruntime as ort
@@ -36,7 +36,7 @@ class LamaInpainter:
 
     def _run(self, img: Image.Image, mask: Image.Image) -> Image.Image:
         """Inpaint a 512x512 RGB image where the 512x512 mask is white."""
-        session = self._get_session()
+        session = self.load_session()
         image_in = np.asarray(img, dtype=np.float32).transpose(2, 0, 1)[None] / 255.0
         mask_in = (np.asarray(mask, dtype=np.float32)[None, None] > 127).astype(np.float32)
 

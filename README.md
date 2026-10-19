@@ -39,6 +39,20 @@ docker run -p 8000:8000 -v cutout-models:/models cutout-studio
 
 **GPU:** install `onnxruntime-gpu` instead of `onnxruntime`, together with matching CUDA/cuDNN libraries. Sessions use CUDA automatically when it's available.
 
+## Use with AI agents
+
+Local AI agents can drive Cutout Studio in two ways:
+- **MCP server (`cutout-mcp`).** For Claude Code, Claude Desktop, Cursor and other MCP clients. It provides tools such as `remove_background`, `remove_foreground`, `erase_regions` (erase boxes) and `batch_process`.
+- **`cutout` CLI, with `--json` output.** For any agent that can run shell commands.
+
+```bash
+pip install -e .
+claude mcp add cutout-studio -- "$PWD/.venv/bin/cutout-mcp"   # Claude Code
+cutout remove-bg photo.jpg --json                              # any shell agent
+```
+
+Setup for each client, the tool reference and conventions are in **[AGENTS.md](AGENTS.md)**.
+
 ## How to use
 
 1. Drop, browse or paste (Ctrl+V) one or more images.
@@ -82,6 +96,8 @@ curl -F image=@photo.jpg -F mode=remove_foreground -F fill=inpaint http://localh
 | `INFERENCE_CONCURRENCY` | `1` | Requests running models at once (bounds RAM) |
 | `MAX_UPLOAD_MB` | `20` | Upload size limit |
 | `MAX_SIDE` | `4096` | Larger images are downscaled to this |
+| `CUTOUT_API_URL` | n/a | CLI/MCP only: send requests to this running server instead of loading models in-process |
+| `CUTOUT_ALLOWED_DIRS` | n/a | CLI/MCP only: restrict readable/writable folders (`:`-separated; `;` on Windows) |
 
 ## Performance notes (4-core CPU, no GPU)
 
@@ -105,8 +121,8 @@ Check the licence of the model you deploy before using it commercially.
 ## Development
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 pytest
 ```
 
-The tests replace the models with fakes, so they run in about a second without downloading anything.
+The tests replace the models with fakes, so they run in a couple of seconds without downloading anything. They cover the HTTP API, CLI and MCP tools, and run the agent operations through both the in-process and the HTTP backend.
